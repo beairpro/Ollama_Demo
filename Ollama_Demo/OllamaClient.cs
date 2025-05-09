@@ -11,6 +11,7 @@ public class OllamaClient : IDisposable
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private bool _disposed = false;
+    private readonly List<object> _messageHistory = new List<object>();
 
     public OllamaClient(string baseUrl)
     {
@@ -25,13 +26,14 @@ public class OllamaClient : IDisposable
     {
         var url = $"{_baseUrl}/v1/chat/completions";
 
+        StringBuilder answer = new();
+
+        _messageHistory.Add(new { role = "user", content = message });
+
         var requestBody = new
         {
             model = "deepseek-r1:14b",
-            messages = new[]
-            {
-                new { role = "user", content = message }
-            },
+            messages = _messageHistory,
             temperature = 0.7,
             max_tokens = 2048,
             stream = true // 🔥开启流式
@@ -83,7 +85,10 @@ public class OllamaClient : IDisposable
                         line = line.Substring(6);
 
                     if (line == "[DONE]")
+                    {
+                        _messageHistory.Add(new { role = "assistant", content = answer.ToString() });
                         return;
+                    }
 
                     try
                     {
@@ -99,6 +104,7 @@ public class OllamaClient : IDisposable
                                 if (!string.IsNullOrEmpty(textPart))
                                 {
                                     Console.Write(textPart); // 逐字符实时输出！
+                                    answer.Append(textPart);
                                     await Task.Delay(10, cancellationToken);
                                 }
                             }
